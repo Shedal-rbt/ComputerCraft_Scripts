@@ -62,7 +62,7 @@ local function addMessage(name, text)
   redraw()
 end
 
-()redraw()
+redraw()
 
 while true do
   local event, p1, p2, p3 = os.pullEvent()
