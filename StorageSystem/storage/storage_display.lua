@@ -8,7 +8,11 @@
 --    Page Up/ Page Down   |    Scroll one screen
 --    Home/End             |    Jump to Top/Bottom
 --    Touch/Click          |    Top/Bottom half of list: Up/Down
---
+--    forward slash        |    Start typing a filter
+--    Tab                  |    Toggle filter scope: Name <-> Mod
+--    Backspace            |    Delete a character while filtering
+--    Enter                |    Keep filter, leave typing mode
+--    Esc                  |    Clear filter, leave typing mode
 -- Setup:
 --      Wired Motem on the computer, wired modem on each storage block.
 --      Network cable between them, optionally attach a monitor
@@ -19,7 +23,6 @@ local inventory = require("lib.inventory")
 local CONFIG = {
   refresh = 2,
   countWidth = 7,
-  showEmpty = false
 }
 
 -- Output target: Monitor if we find one, else use computer terminal.
@@ -67,14 +70,18 @@ local function padLeft(s,w)
 end
 
 local state = {
+  all = {},
   list = {},
   invCount = 0,
   scroll = 0,
+  filtering = false,
+  filterText = "",
+  filterScope = "name",
 }
 --how many rows fit in screen
 local function visibleRows()
   local _, h = target.getSize()
-  return math.max(1, h-3)
+  return math.max(1, h-4)
 end
 -- Prevent over/underscrolling
 local function clampScroll()
@@ -86,13 +93,43 @@ end
 -- Rescan network, rebuild state
 local function refresh()
   local totals, invCount = inventory.scan()
-  local list = {}
+  local all = {}
   for name, entry in pairs(totals) do
-    list[#list + 1] = {name = name, count = entry.count}
+    all[#all + 1] = {name = name, count = entry.count}
   end
-  table.sort(list, function(a,b) return a.name < b.name end)
-  state.list = list
+  table.sort(all, function(a,b) return a.name < b.name end)
+  state.all = all
   state.invCount = invCount
+  applyFilter()
+end
+
+--Rebuild state.list from state.all using the current filter
+--also resets scroll to the top since the visible set changes
+local function applyFilter()
+  local q = state.filterText
+  -- No filter = show all
+  if q == "" then
+    state.list = state.all
+  else
+    local list = {}
+    for _, item in ipairs(state.all) do
+      local mod, name = inventory.splitName(item.name)
+      -- lowercase the stack
+      local haystack
+      if state.filterScope == "mod" then
+        haystack = mod:lower()
+      else
+        haystack = name:lower()
+      end
+      -- plain = true so special characters like "-" or "." in the filter
+      -- arent treated as lua patterns
+      if haystack:find(q, 1, true) then
+        list[#list + 1] = item
+      end
+    end
+    state.list = list
+  end
+  state.scroll = 0
 end
 
 -----------
@@ -105,52 +142,82 @@ local function draw()
   target.setBackgroundColor(colors.black)
   target.clear()
 
-  --Header
-  target.setCursorPos(1,1)
+  -- Header.
+  target.setCursorPos(1, 1)
   target.setTextColor(colors.yellow)
-  target.write(("Storage - %d types / %d inv"):format(#state.list, state.invCount))
-  
-  --Separator
-  target.setCursorPos(1,2)
+  local header
+  if state.filterText == "" then
+    header = ("Storage - %d types / %d inv"):format(#state.list, state.invCount)
+  else
+    header = ("Storage - %d/%d (filter:%s)"):format(
+      #state.list, #state.all, state.filterScope)
+  end
+  target.write(header)
+
+  -- Separator.
+  target.setCursorPos(1, 2)
   target.setTextColor(colors.gray)
-  target.write(string.rep("-",w))
-  --Body
+  target.write(string.rep("-", w))
+
+  -- Body.
   local rows = visibleRows()
   local firstRow = 3
-  local lastRow = h - 1
+  local lastBodyRow = h - 2
+
   if #state.list == 0 then
-    target.setCursorPos(1,firstRow)
+    target.setCursorPos(1, firstRow)
     target.setTextColor(colors.gray)
-    target.write("(No Items)")
+    if state.filterText == "" then
+      target.write("(no items)")
+    else
+      target.write("(no matches)")
+    end
   else
     local row = firstRow
     local last = math.min(#state.list, state.scroll + rows)
+
     for i = state.scroll + 1, last do
       local item = state.list[i]
-      target.setCursorPos(1,row)
+      target.setCursorPos(1, row)
       target.setTextColor(colors.white)
+
       local nameW = w - CONFIG.countWidth - 1
       target.write(
-        padRight(shortName(item.name), nameW) .. " " .. padLeft(tostring(item.count), CONFIG.countWidth)
+        padRight(shortName(item.name), nameW)
+        .. " "
+        .. padLeft(tostring(item.count), CONFIG.countWidth)
       )
       row = row + 1
     end
   end
-    
-  --Footer: Scroll indivator
-  target.setCursorPos(1,h)
+  -- Filter / status line (row h-1).
+  target.setCursorPos(1, h - 1)
+  if state.filtering then
+    target.setTextColor(colors.lightBlue)
+    local cursor = (state.filterText == "" and "_" or "")
+    target.write(padRight(
+      ("filter[%s]: %s%s"):format(state.filterScope, state.filterText, cursor), w))
+  else
+    target.setTextColor(colors.gray)
+    target.write(padRight("  / filter   tab scope   arrows scroll   esc clear", w))
+  end
+
+  -- Footer: scroll indicator (row h).
+  target.setCursorPos(1, h)
   target.setTextColor(colors.gray)
+
   if #state.list <= rows then
     target.write(string.rep(" ", w))
   else
     local first = state.scroll + 1
-    local last = math.min(#state.list, state.scroll + rows)
-    local up = state.scroll > 0 and "^" or " "
-    local down = last < #state.list and "v" or " "
-    local text = (" %s %d-%d/%d %s "):format(up, first, last, #state.list, down)
-    local pad = math.max(0,math.floor((w-#text)/2))
+    local last  = math.min(#state.list, state.scroll + rows)
+    local up    = state.scroll > 0 and "^" or " "
+    local down  = last < #state.list and "v" or " "
+    local text  = (" %s %d-%d/%d %s "):format(up, first, last, #state.list, down)
+    local pad   = math.max(0, math.floor((w - #text) / 2))
     target.write(padRight(string.rep(" ", pad) .. text, w))
   end
+
   target.setTextColor(colors.white)
 end
 
@@ -163,7 +230,34 @@ local function scrollBy(amount)
   draw()
 end
 
+--------------------
+-- Event Handling --
+--------------------
+
 local function handleKey(keyCode)
+  -- While filtering, keys go into the filter instead of scrolling.
+  if state.filtering then
+    if keyCode == keys.backspace then
+      state.filterText = state.filterText:sub(1, -2)
+      applyFilter()
+      draw()
+    elseif keyCode == keys.enter then
+      state.filtering = false
+      draw()
+    elseif keyCode == keys.escape then
+      state.filtering = false
+      state.filterText = ""
+      applyFilter()
+      draw()
+    elseif keyCode == keys.tab then
+      state.filterScope = (state.filterScope == "name") and "mod" or "name"
+      applyFilter()
+      draw()
+    end
+    return
+  end
+
+  -- Not filtering: normal navigation.
   if keyCode == keys.up then
     scrollBy(-1)
   elseif keyCode == keys.down then
@@ -175,25 +269,47 @@ local function handleKey(keyCode)
   elseif keyCode == keys.home then
     state.scroll = 0
     draw()
-  elseif keyCode ==keys["end"] then
+  elseif keyCode == keys["end"] then
     state.scroll = #state.list
     clampScroll()
+    draw()
+  elseif keyCode == keys.slash then
+    state.filtering = true
+    draw()
+  elseif keyCode == keys.escape then
+    state.filterText = ""
+    applyFilter()
     draw()
   end
 end
 
--- handle taps
-local function handleTap(x,y)
+-- Append typed characters to the filter.
+local function handleChar(ch)
+  if not state.filtering then return end
+
+  -- Only accept printable characters. Ignore control chars.
+  if #ch == 1 and ch:byte() >= 32 then
+    state.filterText = state.filterText .. ch:lower()
+    applyFilter()
+    draw()
+  end
+end
+
+local function handleTap(x, y)
   local _, h = target.getSize()
-  -- ignore taps on header, footer, or seperator
-  if y < 3 or y > h-1 then return end
-  local bodyMid = 3 + math.floor((h-1-3)/2)
+
+  -- Taps on the body scroll. Taps elsewhere do nothing for now.
+  if y < 3 or y > h - 2 then return end
+
+  local bodyMid = 3 + math.floor((h - 2 - 3) / 2)
+
   if y <= bodyMid then
     scrollBy(-1)
   else
     scrollBy(1)
   end
 end
+
 
 ---------------
 -- Main Loop --
@@ -204,25 +320,35 @@ refresh()
 draw()
 
 local timer = os.startTimer(CONFIG.refresh)
+
 while true do
   local event, p1, p2, p3 = os.pullEvent()
+
   if event == "timer" and p1 == timer then
-    local ok, err = pcall(function() 
+    local ok, err = pcall(function()
       refresh()
       draw()
     end)
     if not ok then printError(tostring(err)) end
+
     timer = os.startTimer(CONFIG.refresh)
+
   elseif event == "key" then
     handleKey(p1)
+
+  elseif event == "char" then
+    handleChar(p1)
+
   elseif event == "monitor_touch" then
     if not monitorName or p1 == monitorName or p1 == "monitor" then
       handleTap(p2, p3)
     end
-  elseif event == "mouse_click" then 
-    if p1==1 then 
+
+  elseif event == "mouse_click" then
+    if p1 == 1 then
       handleTap(p2, p3)
     end
+
   elseif event == "monitor_resize" or event == "term_resize" then
     draw()
   end
