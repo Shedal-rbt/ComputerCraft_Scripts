@@ -92,4 +92,15 @@ function inventory.scanOne(name)
   return contents or {}
 end
 
+-- Splits an item into its mod name and item name
+-- Returns mod name and item name seperately, if no mod name detected, returns "" and original string. 
+function inventory.splitName(full)
+  local mod, name = full:match("^([^:]+):(.+)$")
+  if mod then
+    return mod, name
+  end
+  return "", full
+end
+end
+
 return inventory
