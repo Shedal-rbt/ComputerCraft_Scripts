@@ -90,20 +90,6 @@ local function clampScroll()
   if state.scroll < 0 then state.scroll = 0 end
 end
 
--- Rescan network, rebuild state
-local function refresh()
-  local totals, invCount = inventory.scan()
-  local all = {}
-  for name, entry in pairs(totals) do
-    all[#all + 1] = { name = name, count = entry.count }
-  end
-  table.sort(all, function(a, b) return a.name < b.name end)
-  state.all = all
-  state.invCount = invCount
-  applyFilter()
-end
-
-
 --Rebuild state.list from state.all using the current filter
 --also resets scroll to the top since the visible set changes
 local function applyFilter()
@@ -131,6 +117,19 @@ local function applyFilter()
     state.list = list
   end
   state.scroll = 0
+end
+
+-- Rescan network, rebuild state
+local function refresh()
+  local totals, invCount = inventory.scan()
+  local all = {}
+  for name, entry in pairs(totals) do
+    all[#all + 1] = { name = name, count = entry.count }
+  end
+  table.sort(all, function(a, b) return a.name < b.name end)
+  state.all = all
+  state.invCount = invCount
+  applyFilter()
 end
 
 -----------
