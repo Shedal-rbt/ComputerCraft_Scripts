@@ -8,7 +8,7 @@ local CONFIG = {
 }
 
 -- Target is either the first monitor found or the terminal of the computer
-local monitor = peripheral.find(monitor)
+local monitor = peripheral.find("monitor")
 local target = monitor or term
 
 -- isInventory: Returns true if the peripheral has the methods 'list' and 'size'
