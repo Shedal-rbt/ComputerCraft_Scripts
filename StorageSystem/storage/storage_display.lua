@@ -95,13 +95,14 @@ local function refresh()
   local totals, invCount = inventory.scan()
   local all = {}
   for name, entry in pairs(totals) do
-    all[#all + 1] = {name = name, count = entry.count}
+    all[#all + 1] = { name = name, count = entry.count }
   end
-  table.sort(all, function(a,b) return a.name < b.name end)
+  table.sort(all, function(a, b) return a.name < b.name end)
   state.all = all
   state.invCount = invCount
   applyFilter()
 end
+
 
 --Rebuild state.list from state.all using the current filter
 --also resets scroll to the top since the visible set changes
