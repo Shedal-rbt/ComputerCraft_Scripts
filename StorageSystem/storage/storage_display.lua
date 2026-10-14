@@ -113,7 +113,7 @@ local function draw()
   --Separator
   target.setCursorPos(1,2)
   target.setTextColor(colors.gray)
-  target.write(string.rep("-",w)
+  target.write(string.rep("-",w))
   --Body
   local rows = visibleRows()
   local firstRow = 3
