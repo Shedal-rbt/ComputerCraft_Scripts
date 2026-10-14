@@ -141,14 +141,14 @@ local function draw()
   target.setCursorPos(1,h)
   target.setTextColor(colors.gray)
   if #state.list <= rows then
-    target.write(string.rep(" ", w)
+    target.write(string.rep(" ", w))
   else
     local first = state.scroll + 1
     local last = math.min(#state.list, state.scroll + rows)
     local up = state.scroll > 0 and "^" or " "
     local down = last < #state.list and "v" or " "
     local text = (" %s %d-%d\%d %s "):format(up, first, last, #state.list, down)
-    local pad = math.max(0,math.floor((w-#text)/2)
+    local pad = math.max(0,math.floor((w-#text)/2))
     target.write(padRight(string.rep(" ", pad) .. text, w))
   end
   target.setTextColor(colors.white)
@@ -170,9 +170,9 @@ local function handleKey(keyCode)
     scrollBy(1)
   elseif keyCode == keys.pageUp then
     scrollBy(-visibleRows())
-  elseif keyCode == keys.pageDown
+  elseif keyCode == keys.pageDown then
     scrollBy(visibleRows())
-  elseIf keyCode == keys.home then
+  elseif keyCode == keys.home then
     state.scroll = 0
     draw()
   elseif keyCode ==keys["end"] then
