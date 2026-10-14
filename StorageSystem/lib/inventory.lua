@@ -50,7 +50,7 @@ function inventory.find()
     if inventory.isInventory(name) then
       local fp = inventory.fingerprint(name)
       -- If we cant Fingerprint, better to count it. Better to double/triple count than not count at all.
-      if not fp then
+      if not fp or fp == "" then
         names[#names + 1] = name
       elseif not seen[fp] then
         seen[fp] = true
