@@ -118,7 +118,7 @@ local function draw()
   local rows = visibleRows()
   local firstRow = 3
   local lastRow = h - 1
-  if #state.list = 0 then
+  if #state.list == 0 then
     target.setCursorPos(1,firstRow)
     target.setTextColor(colors.gray)
     target.write("(No Items)")
