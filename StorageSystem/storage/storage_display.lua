@@ -67,9 +67,9 @@ local function padLeft(s,w)
 end
 
 local state = {
-  list = {}
-  invCount = 0
-  scroll = 0
+  list = {},
+  invCount = 0,
+  scroll = 0,
 }
 --how many rows fit in screen
 local function visibleRows()
