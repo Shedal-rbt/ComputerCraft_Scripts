@@ -11,9 +11,7 @@ local SIDE_NAMES = {
 
 --Returns true if 'name' looks like an inventory peripheral.
 function inventory.isInventory(name)
-  if SIDE_NAMES[name] then 
-    return false
-  end
+  -- if SIDE_NAMES[name] then return false end
   local methods = peripheral.getMethods(name) or {}
   local hasList, hasSize = false, false
   -- Go through methods, see if it has size/list
