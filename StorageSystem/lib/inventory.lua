@@ -101,6 +101,5 @@ function inventory.splitName(full)
   end
   return "", full
 end
-end
 
 return inventory
