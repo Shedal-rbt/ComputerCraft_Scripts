@@ -42,7 +42,7 @@ function inventory.fingerprint(name)
       parts[#parts + 1] = slot .. ":" .. item.name .. "=" .. item.count
   end
   table.sort(parts)
-  return table.concat(parts, "|"
+  return table.concat(parts, "|")
 end
 
   -- returns an array of names for every unqiue inventory on the network
@@ -69,7 +69,7 @@ end
 function inventory.scan()
   local totals = {}
   local invCount = 0
-  for _, name in ipairs(inventory.find()) do'
+  for _, name in ipairs(inventory.find()) do
     local contents = inventory.listContents(name)
     if contents then
       local used = false
