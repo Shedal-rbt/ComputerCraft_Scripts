@@ -54,7 +54,7 @@ function inventory.find()
         names[#names + 1] = name
       elseif not seen[fp] then
         seen[fp] = true
-        names[#name + 1] = name
+        names[#names + 1] = name
       end
     end
   end
