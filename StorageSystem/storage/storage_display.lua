@@ -147,7 +147,7 @@ local function draw()
     local last = math.min(#state.list, state.scroll + rows)
     local up = state.scroll > 0 and "^" or " "
     local down = last < #state.list and "v" or " "
-    local text = (" %s %d-%d\%d %s "):format(up, first, last, #state.list, down)
+    local text = (" %s %d-%d/%d %s "):format(up, first, last, #state.list, down)
     local pad = math.max(0,math.floor((w-#text)/2))
     target.write(padRight(string.rep(" ", pad) .. text, w))
   end
