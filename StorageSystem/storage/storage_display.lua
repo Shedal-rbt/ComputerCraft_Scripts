@@ -13,7 +13,7 @@
 --      Wired Motem on the computer, wired modem on each storage block.
 --      Network cable between them, optionally attach a monitor
 
-local inventory = require(lib.inventory)
+local inventory = require("lib.inventory")
 
 -- Config:
 local CONFIG = {
