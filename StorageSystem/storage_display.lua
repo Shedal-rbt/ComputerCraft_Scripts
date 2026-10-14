@@ -16,7 +16,7 @@ local function isInventory(name)
   local methods = peripheral.getMethods(name) or {}
   local hasList = false
   local hasSize = false
-  for _, in ipairs(methods) do
+  for _, m in ipairs(methods) do
     if m == "list" then hasList = true end
     if m == "size" then hasSize = true end
   end
