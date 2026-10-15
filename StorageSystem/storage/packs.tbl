@@ -1,0 +1,21 @@
+return {
+ -- Slots 1..3 of each role pack. order matters.
+ -- Names are full IDs count optional (default = 'atleast 1')
+  roles = {
+    messy = {
+      { name = "minecraft:green_wool" },
+      { name = "minecraft:blue_wool" },
+      { name = "minecraft:green_wool" },
+    },
+    outbox = {
+      { name = "minecraft:red_wool" },
+      { name = "minecraft:green_wool" },
+      { name = "minecraft:red_wool" },
+    },
+    inbox = {
+      { name = "minecraft:blue_wool" },
+      { name = "minecraft:red_wool" },
+      { name = "minecraft:blue_wool" },
+    },
+  },
+}
