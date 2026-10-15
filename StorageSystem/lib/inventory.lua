@@ -136,7 +136,7 @@ function inventory.resolveRoles(roles)
     if contents then
       for role, signature in pairs(roles) do 
         if inventory.matchSignature(contents, signature) then
-          resolved[role] = name]
+          resolved[role] = name
         end
       end
     end
