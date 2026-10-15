@@ -69,6 +69,10 @@ local function padLeft(s,w)
   return string.rep(" ", w - #s) .. s
 end
 
+--Debounce: When set, a timer is pending that will redraw soon
+local redrawPending = false
+local redrawTimer = nil
+
 local state = {
   all = {},
   list = {},
@@ -140,7 +144,6 @@ local function draw()
   clampScroll()
 
   target.setBackgroundColor(colors.black)
-  target.clear()
 
   -- Header.
   target.setCursorPos(1, 1)
@@ -182,13 +185,19 @@ local function draw()
       target.setTextColor(colors.white)
 
       local nameW = w - CONFIG.countWidth - 1
-      target.write(
-        padRight(shortName(item.name), nameW)
-        .. " "
-        .. padLeft(tostring(item.count), CONFIG.countWidth)
+      target.write(padRight(
+          padRight(shortName(item.name), nameW)
+          .. " "
+          .. padLeft(tostring(item.count),
+            CONFIG.countWidth)
       )
       row = row + 1
     end
+  end
+  while row <= lastBodyRow do
+    target.setCursorPos(1,row)
+    target.write(string.rep(" ", w))
+    row = row + 1
   end
   -- Filter / status line (row h-1).
   target.setCursorPos(1, h - 1)
@@ -221,6 +230,13 @@ local function draw()
   target.setTextColor(colors.white)
 end
 
+-- Request a redraw, if one is already scheduled, does nothing, it'll pick up the latest state when it fires.
+local function requestRedraw()
+  if redrawTimer then return end
+  redrawPending = true
+  redrawTimer = os.startTimer(0.05) --(Caps at 20 draws per second)
+end
+
 ---------------
 -- Scrolling --
 ---------------
@@ -240,10 +256,10 @@ local function handleKey(keyCode)
     if keyCode == keys.backspace then
       state.filterText = state.filterText:sub(1, -2)
       applyFilter()
-      draw()
+      requestRedraw()
     elseif keyCode == keys.enter then
       state.filtering = false
-      draw()
+      requestRedraw()
     elseif keyCode == keys.escape then
       state.filtering = false
       state.filterText = ""
@@ -252,7 +268,7 @@ local function handleKey(keyCode)
     elseif keyCode == keys.tab then
       state.filterScope = (state.filterScope == "name") and "mod" or "name"
       applyFilter()
-      draw()
+      requestRedraw()
     end
     return
   end
@@ -268,11 +284,11 @@ local function handleKey(keyCode)
     scrollBy(visibleRows())
   elseif keyCode == keys.home then
     state.scroll = 0
-    draw()
+    requestRedraw()
   elseif keyCode == keys["end"] then
     state.scroll = #state.list
     clampScroll()
-    draw()
+    requestRedraw()
   elseif keyCode == keys.slash then
     state.filtering = true
     draw()
@@ -291,7 +307,7 @@ local function handleChar(ch)
   if #ch == 1 and ch:byte() >= 32 then
     state.filterText = state.filterText .. ch:lower()
     applyFilter()
-    draw()
+    requestRedraw()
   end
 end
 
@@ -351,5 +367,11 @@ while true do
 
   elseif event == "monitor_resize" or event == "term_resize" then
     draw()
+  elseif event == "timer" and p1 = redrawTimer then 
+    redrawTimer = nil
+    if redrawPending then
+      redrawPending = false
+      draw()
+    end
   end
 end
