@@ -1,37 +1,35 @@
 -- storage_display.lua
 --
--- Live view of every inventory on the wired network, with scrolling
--- Discovery handled by lib/inventory
+-- Live view of every inventory on the wired network, with scrolling.
+-- Discovery handled by lib/inventory.
 --
 -- Controls:
---    Arrow Up/Down        |    Scroll one row
---    Page Up/ Page Down   |    Scroll one screen
---    Home/End             |    Jump to Top/Bottom
---    Touch/Click          |    Top/Bottom half of list: Up/Down
---    forward slash        |    Start typing a filter
---    Tab                  |    Toggle filter scope: Name <-> Mod
---    Backspace            |    Delete a character while filtering
---    Enter                |    Keep filter, leave typing mode
---    Esc                  |    Clear filter, leave typing mode
--- Setup:
---      Wired Motem on the computer, wired modem on each storage block.
---      Network cable between them, optionally attach a monitor
-
+--    Arrow Up/Down        | Scroll one row
+--    Page Up/Page Down    | Scroll one screen
+--    Home/End             | Jump to Top/Bottom
+--    Touch/Click          | Top/Bottom half of list: Up/Down
+--    forward slash        | Start typing a filter
+--    Tab                  | Toggle filter scope: Name <-> Mod
+--    Backspace            | Delete a character while filtering
+--    Enter                | Keep filter, leave typing mode
+--    Esc                  | Clear filter, leave typing mode
+ 
 local inventory = require("lib.inventory")
-
--- Config:
+ 
 local CONFIG = {
   refresh = 2,
   countWidth = 7,
+  redrawDelay = 0.05,
 }
-
--- Output target: Monitor if we find one, else use computer terminal.
+ 
+-- Output target: monitor if available, otherwise terminal.
 local monitor = peripheral.find("monitor")
 local target = monitor or term
+ 
 if monitor then
   monitor.setTextScale(0.5)
 end
-
+ 
 local monitorName = nil
 if monitor then
   for _, name in ipairs(peripheral.getNames()) do
@@ -41,38 +39,33 @@ if monitor then
     end
   end
 end
-
-
+ 
 ----------------------
---Formatting helpers--
+-- Formatting helpers
 ----------------------
-
--- Shortens full item names
--- (EG: minecraft:iron_ingot -> iron_ingot)
+ 
 local function shortName(full)
   return full:match(":(.+)$") or full
 end
-
--- pads a string 's' on the right with spaces til its 'w' characters wide, if larger than w than truncate it
-local function padRight(s,w)
+ 
+local function padRight(s, w)
   if #s >= w then
-    return s:sub(1,w)
+    return s:sub(1, w)
   end
   return s .. string.rep(" ", w - #s)
 end
-
--- Same as padright, but for the left.
-local function padLeft(s,w)
+ 
+local function padLeft(s, w)
   if #s >= w then
-    return s:sub(1,w)
+    return s:sub(1, w)
   end
   return string.rep(" ", w - #s) .. s
 end
-
---Debounce: When set, a timer is pending that will redraw soon
-local redrawPending = false
-local redrawTimer = nil
-
+ 
+----------------
+-- Application state
+----------------
+ 
 local state = {
   all = {},
   list = {},
@@ -82,295 +75,378 @@ local state = {
   filterText = "",
   filterScope = "name",
 }
---how many rows fit in screen
+ 
+local redrawTimer = nil
+ 
 local function visibleRows()
   local _, h = target.getSize()
-  return math.max(1, h-4)
+  return math.max(1, h - 4)
 end
--- Prevent over/underscrolling
+ 
 local function clampScroll()
-  local maxScroll = math.max(0,#state.list - visibleRows())
-  if state.scroll > maxScroll then state.scroll = maxScroll end
-  if state.scroll < 0 then state.scroll = 0 end
+  local maxScroll = math.max(0, #state.list - visibleRows())
+ 
+  if state.scroll > maxScroll then
+    state.scroll = maxScroll
+  end
+ 
+  if state.scroll < 0 then
+    state.scroll = 0
+  end
 end
-
---Rebuild state.list from state.all using the current filter
---also resets scroll to the top since the visible set changes
-local function applyFilter()
+ 
+----------------
+-- Filtering
+----------------
+ 
+-- Each item caches its lowercase name and mod ID.
+-- resetScroll is true when the user changes the filter.
+local function applyFilter(resetScroll)
   local q = state.filterText
-  -- No filter = show all
+ 
   if q == "" then
     state.list = state.all
   else
     local list = {}
+    local field = state.filterScope == "mod"
+      and "modLower"
+      or "nameLower"
+ 
     for _, item in ipairs(state.all) do
-      local mod, name = inventory.splitName(item.name)
-      -- lowercase the stack
-      local haystack
-      if state.filterScope == "mod" then
-        haystack = mod:lower()
-      else
-        haystack = name:lower()
-      end
-      -- plain = true so special characters like "-" or "." in the filter
-      -- arent treated as lua patterns
-      if haystack:find(q, 1, true) then
+      if item[field]:find(q, 1, true) then
         list[#list + 1] = item
       end
     end
+ 
     state.list = list
   end
-  state.scroll = 0
+ 
+  if resetScroll then
+    state.scroll = 0
+  end
+ 
+  clampScroll()
 end
-
--- Rescan network, rebuild state
+ 
+----------------
+-- Inventory refresh
+----------------
+ 
 local function refresh()
   local totals, invCount = inventory.scan()
   local all = {}
+ 
   for name, entry in pairs(totals) do
-    all[#all + 1] = { name = name, count = entry.count }
+    local mod, itemName = inventory.splitName(name)
+ 
+    all[#all + 1] = {
+      name = name,
+      count = entry.count,
+ 
+      -- Cache values used by filtering.
+      modLower = mod:lower(),
+      nameLower = itemName:lower(),
+    }
   end
-  table.sort(all, function(a, b) return a.name < b.name end)
+ 
+  table.sort(all, function(a, b)
+    return a.name < b.name
+  end)
+ 
   state.all = all
   state.invCount = invCount
-  applyFilter()
+ 
+  -- Rebuild the filtered list without resetting the user's scroll.
+  applyFilter(false)
 end
-
+ 
 -----------
---DRAWING--
+-- Drawing
 -----------
+ 
 local function draw()
   local w, h = target.getSize()
   clampScroll()
-
+ 
   target.setBackgroundColor(colors.black)
-
+ 
   -- Header.
   target.setCursorPos(1, 1)
   target.setTextColor(colors.yellow)
+ 
   local header
   if state.filterText == "" then
-    header = ("Storage - %d types / %d inv"):format(#state.list, state.invCount)
+    header = ("Storage - %d types / %d inv"):format(
+      #state.list, state.invCount)
   else
     header = ("Storage - %d/%d (filter:%s)"):format(
       #state.list, #state.all, state.filterScope)
   end
-  target.write(header)
-
+ 
+  target.write(padRight(header, w))
+ 
   -- Separator.
   target.setCursorPos(1, 2)
   target.setTextColor(colors.gray)
   target.write(string.rep("-", w))
-
+ 
   -- Body.
   local rows = visibleRows()
   local firstRow = 3
   local lastBodyRow = h - 2
   local row = firstRow
+ 
   if #state.list == 0 then
     target.setCursorPos(1, firstRow)
     target.setTextColor(colors.gray)
-    if state.filterText == "" then
-      target.write("(no items)")
-    else
-      target.write("(no matches)")
-    end
+ 
+    target.write(
+      state.filterText == "" and "(no items)" or "(no matches)"
+    )
   else
     local last = math.min(#state.list, state.scroll + rows)
-
+    local nameW = math.max(0, w - CONFIG.countWidth - 1)
+ 
     for i = state.scroll + 1, last do
       local item = state.list[i]
+ 
       target.setCursorPos(1, row)
       target.setTextColor(colors.white)
-
-      local nameW = w - CONFIG.countWidth - 1
-      target.write(padRight(
-          padRight(shortName(item.name), nameW)
-          .. " "
-          .. padLeft(tostring(item.count),
-            CONFIG.countWidth), w)
-      )
+ 
+      local line = padRight(shortName(item.name), nameW)
+        .. " "
+        .. padLeft(tostring(item.count), CONFIG.countWidth)
+ 
+      target.write(padRight(line, w))
       row = row + 1
     end
   end
+ 
+  -- Clear unused body rows.
   while row <= lastBodyRow do
-    target.setCursorPos(1,row)
+    target.setCursorPos(1, row)
+    target.setTextColor(colors.white)
     target.write(string.rep(" ", w))
     row = row + 1
   end
-  -- Filter / status line (row h-1).
+ 
+  -- Filter / status line.
   target.setCursorPos(1, h - 1)
+ 
   if state.filtering then
     target.setTextColor(colors.lightBlue)
-    local cursor = (state.filterText == "" and "_" or "")
-    target.write(padRight(
-      ("filter[%s]: %s%s"):format(state.filterScope, state.filterText, cursor), w))
+ 
+    local cursor = state.filterText == "" and "_" or ""
+    local line = ("filter[%s]: %s%s"):format(
+      state.filterScope, state.filterText, cursor)
+ 
+    target.write(padRight(line, w))
   else
     target.setTextColor(colors.gray)
-    target.write(padRight("  / filter   tab scope   arrows scroll   esc clear", w))
+    target.write(padRight(
+      "  / filter   tab scope   arrows scroll   esc clear", w))
   end
-
-  -- Footer: scroll indicator (row h).
+ 
+  -- Scroll indicator.
   target.setCursorPos(1, h)
   target.setTextColor(colors.gray)
-
+ 
   if #state.list <= rows then
     target.write(string.rep(" ", w))
   else
     local first = state.scroll + 1
-    local last  = math.min(#state.list, state.scroll + rows)
-    local up    = state.scroll > 0 and "^" or " "
-    local down  = last < #state.list and "v" or " "
-    local text  = (" %s %d-%d/%d %s "):format(up, first, last, #state.list, down)
-    local pad   = math.max(0, math.floor((w - #text) / 2))
-    target.write(padRight(string.rep(" ", pad) .. text, w))
+    local last = math.min(#state.list, state.scroll + rows)
+    local up = state.scroll > 0 and "^" or " "
+    local down = last < #state.list and "v" or " "
+ 
+    local line = (" %s %d-%d/%d %s "):format(
+      up, first, last, #state.list, down)
+ 
+    local pad = math.max(0, math.floor((w - #line) / 2))
+ 
+    target.write(padRight(string.rep(" ", pad) .. line, w))
   end
-
+ 
   target.setTextColor(colors.white)
 end
-
--- Request a redraw, if one is already scheduled, does nothing, it'll pick up the latest state when it fires.
+ 
+----------------
+-- Redraw scheduling
+----------------
+ 
 local function requestRedraw()
-  if redrawTimer then return end
-  redrawPending = true
-  redrawTimer = os.startTimer(0.05) --(Caps at 20 draws per second)
+  if redrawTimer then
+    return
+  end
+ 
+  redrawTimer = os.startTimer(CONFIG.redrawDelay)
 end
-
----------------
--- Scrolling --
----------------
+ 
 local function scrollBy(amount)
   state.scroll = state.scroll + amount
   clampScroll()
-  draw()
+  requestRedraw()
 end
-
---------------------
--- Event Handling --
---------------------
-
+ 
+----------------
+-- Keyboard input
+----------------
+ 
 local function handleKey(keyCode)
-  -- While filtering, keys go into the filter instead of scrolling.
   if state.filtering then
     if keyCode == keys.backspace then
       state.filterText = state.filterText:sub(1, -2)
-      applyFilter()
+      applyFilter(true)
       requestRedraw()
+ 
     elseif keyCode == keys.enter then
       state.filtering = false
       requestRedraw()
+ 
     elseif keyCode == keys.escape then
       state.filtering = false
       state.filterText = ""
-      applyFilter()
-      draw()
+      applyFilter(true)
+      requestRedraw()
+ 
     elseif keyCode == keys.tab then
-      state.filterScope = (state.filterScope == "name") and "mod" or "name"
-      applyFilter()
+      state.filterScope =
+        state.filterScope == "name" and "mod" or "name"
+ 
+      applyFilter(true)
       requestRedraw()
     end
+ 
     return
   end
-
-  -- Not filtering: normal navigation.
+ 
   if keyCode == keys.up then
     scrollBy(-1)
+ 
   elseif keyCode == keys.down then
     scrollBy(1)
+ 
   elseif keyCode == keys.pageUp then
     scrollBy(-visibleRows())
+ 
   elseif keyCode == keys.pageDown then
     scrollBy(visibleRows())
+ 
   elseif keyCode == keys.home then
     state.scroll = 0
     requestRedraw()
+ 
   elseif keyCode == keys["end"] then
     state.scroll = #state.list
     clampScroll()
     requestRedraw()
+ 
   elseif keyCode == keys.slash then
     state.filtering = true
-    draw()
+    requestRedraw()
+ 
   elseif keyCode == keys.escape then
     state.filterText = ""
-    applyFilter()
-    draw()
-  end
-end
-
--- Append typed characters to the filter.
-local function handleChar(ch)
-  if not state.filtering then return end
-
-  -- Only accept printable characters. Ignore control chars.
-  if #ch == 1 and ch:byte() >= 32 then
-    state.filterText = state.filterText .. ch:lower()
-    applyFilter()
+    applyFilter(true)
     requestRedraw()
   end
 end
-
+ 
+local function handleChar(ch)
+  if not state.filtering then
+    return
+  end
+ 
+  if #ch == 1 and ch:byte() >= 32 then
+    state.filterText = state.filterText .. ch:lower()
+    applyFilter(true)
+    requestRedraw()
+  end
+end
+ 
+----------------
+-- Mouse / monitor input
+----------------
+ 
 local function handleTap(x, y)
   local _, h = target.getSize()
-
-  -- Taps on the body scroll. Taps elsewhere do nothing for now.
-  if y < 3 or y > h - 2 then return end
-
+ 
+  if y < 3 or y > h - 2 then
+    return
+  end
+ 
   local bodyMid = 3 + math.floor((h - 2 - 3) / 2)
-
+ 
   if y <= bodyMid then
     scrollBy(-1)
   else
     scrollBy(1)
   end
 end
-
-
----------------
--- Main Loop --
----------------
-
--- Initial scan/draw
-refresh()
-draw()
-
-local timer = os.startTimer(CONFIG.refresh)
-
-while true do
-  local event, p1, p2, p3 = os.pullEvent()
-
-  if event == "timer" and p1 == timer then
-    local ok, err = pcall(function()
-      refresh()
-      draw()
-    end)
-    if not ok then printError(tostring(err)) end
-
-    timer = os.startTimer(CONFIG.refresh)
-
-  elseif event == "key" then
-    handleKey(p1)
-
-  elseif event == "char" then
-    handleChar(p1)
-
-  elseif event == "monitor_touch" then
-    if not monitorName or p1 == monitorName or p1 == "monitor" then
-      handleTap(p2, p3)
-    end
-
-  elseif event == "mouse_click" then
-    if p1 == 1 then
-      handleTap(p2, p3)
-    end
-
-  elseif event == "monitor_resize" or event == "term_resize" then
-    draw()
-  elseif event == "timer" and p1 == redrawTimer then 
-    redrawTimer = nil
-    if redrawPending then
-      redrawPending = false
+ 
+----------------
+-- Input event loop
+----------------
+ 
+local function inputLoop()
+  while true do
+    local event, p1, p2, p3 = os.pullEvent()
+ 
+    if event == "key" then
+      handleKey(p1)
+ 
+    elseif event == "char" then
+      handleChar(p1)
+ 
+    elseif event == "monitor_touch" then
+      if not monitorName or p1 == monitorName or p1 == "monitor" then
+        handleTap(p2, p3)
+      end
+ 
+    elseif event == "mouse_click" then
+      if p1 == 1 then
+        handleTap(p2, p3)
+      end
+ 
+    elseif event == "monitor_resize" or event == "term_resize" then
+      requestRedraw()
+ 
+    elseif event == "timer" and p1 == redrawTimer then
+      redrawTimer = nil
       draw()
     end
   end
 end
+ 
+----------------
+-- Refresh loop
+----------------
+ 
+local function refreshLoop()
+  while true do
+    os.sleep(CONFIG.refresh)
+ 
+    local ok, err = pcall(refresh)
+ 
+    if ok then
+      requestRedraw()
+    else
+      printError("Storage refresh failed: " .. tostring(err))
+    end
+  end
+end
+ 
+----------------
+-- Startup
+----------------
+ 
+local ok, err = pcall(refresh)
+ 
+if not ok then
+  error("Initial storage scan failed: " .. tostring(err), 0)
+end
+ 
+draw()
+ 
+-- Run input handling and periodic refresh as separate coroutines.
+parallel.waitForAny(inputLoop, refreshLoop)
