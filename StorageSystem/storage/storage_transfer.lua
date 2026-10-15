@@ -49,7 +49,7 @@ local function findMatches(query)
               pack = packName,
               slot = slot,
               name = item.name,
-              count = item.count,,
+              count = item.count,
             }
           end
         end
@@ -82,7 +82,7 @@ local function findDestSlot(destName, itemName)
         if ok and type(val) == "number" then
           limit = val
         end
-        local count = contents[slots].count
+        local count = contents[slot].count
         if count < limit and count > bestMergeCount then
           bestMergeCount = count
           bestMergeSlot = slot
