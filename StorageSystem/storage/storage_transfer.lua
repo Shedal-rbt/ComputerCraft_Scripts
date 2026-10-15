@@ -28,8 +28,13 @@ if not checkRoles() then return end
 -------------
 
 --Marker slots are reserved for markets, nothing the transfer script does is allowed to touch them.
-local function isMarkerSlot(slot)
-  return slot <= packs.markerSlots
+local function isMarkerSlot(packName, slot)
+  if packName == roles.inbox
+    or packName == roles.outbox
+    or packname == roles.messy then
+    return slot <= packs.markerSlots
+  end
+  return false
 end
 
 -- Every item stack matching 'query' (case-insensitive substring on the short name,
@@ -42,7 +47,7 @@ local function findMatches(query)
   for packName, contents  in pairs(inventory.scanEach()) do
     if packName ~= roles.outbox then
       for slot, item in pairs(contents) do
-        if not isMarkerSlot(slot) then
+        if not isMarkerSlot(packName, slot) then
           local _, short = inventory.splitName(item.name)
           if short:lower():find(q, 1, true) then
             matches[#matches + 1] = {
@@ -72,7 +77,7 @@ local function findDestSlot(destName, itemName)
   local bestMergeCount = -1
   local firstFree = nil
   for slot = 1, size do
-    if isMarkerSlot(slot) then
+    if isMarkerSlot(destName, slot) then
       -- We do nothing here, because we NEVER touch markers
     elseif contents[slot] then
       if contents[slot].name == itemName then
@@ -210,7 +215,7 @@ local function cmdStore()
        and packName ~= roles.outbox
        and packName ~= roles.messy then
       for slot, item in pairs(packContents) do
-        if not isMarkerSlot(slot) then
+        if not isMarkerSlot(packName, slot) then
           -- Query the stack limit for this slot.
           local limit = 64
           local ok, val = pcall(peripheral.call, packName, "getItemLimit", slot)
@@ -232,7 +237,7 @@ local function cmdStore()
   local toMessy = 0
   -- Walk the inbox and move each stack.
   for slot, item in pairs(contents) do
-    if not isMarkerSlot(slot) then
+    if not isMarkerSlot(roles.inbox, slot) then
       local destName, destSlot = nil, nil
       -- 1. Try packs that already hold this item.
       --    orderPacks puts the pack with the fullest partial stack first.
