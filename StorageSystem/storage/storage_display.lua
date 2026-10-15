@@ -14,7 +14,7 @@
 --    Enter                | Keep filter, leave typing mode
 --    Esc                  | Clear filter, leave typing mode
  
-local inventory = require("lib.inventory")
+local inventory = require("storage.lib.inventory")
  
 local CONFIG = {
   refresh = 2,
