@@ -367,7 +367,7 @@ while true do
 
   elseif event == "monitor_resize" or event == "term_resize" then
     draw()
-  elseif event == "timer" and p1 = redrawTimer then 
+  elseif event == "timer" and p1 == redrawTimer then 
     redrawTimer = nil
     if redrawPending then
       redrawPending = false
