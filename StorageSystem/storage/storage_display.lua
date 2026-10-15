@@ -166,7 +166,7 @@ local function draw()
   local rows = visibleRows()
   local firstRow = 3
   local lastBodyRow = h - 2
-
+  local row = firstRow
   if #state.list == 0 then
     target.setCursorPos(1, firstRow)
     target.setTextColor(colors.gray)
@@ -176,7 +176,6 @@ local function draw()
       target.write("(no matches)")
     end
   else
-    local row = firstRow
     local last = math.min(#state.list, state.scroll + rows)
 
     for i = state.scroll + 1, last do
