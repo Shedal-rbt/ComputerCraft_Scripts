@@ -18,4 +18,5 @@ return {
       { name = "minecraft:blue_wool" },
     },
   },
+  markerSlots = 3,
 }
