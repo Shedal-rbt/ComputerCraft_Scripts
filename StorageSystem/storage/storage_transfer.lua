@@ -46,10 +46,10 @@ local function findMatches(query)
           local _, short = inventory.splitName(item.name)
           if short:lower():find(q, 1, true) then
             matches[#matches + 1] = {
-              pack = packName
-              slot = slot
-              name = item.name
-              count = item.count
+              pack = packName,
+              slot = slot,
+              name = item.name,
+              count = item.count,,
             }
           end
         end
