@@ -189,7 +189,7 @@ local function draw()
           padRight(shortName(item.name), nameW)
           .. " "
           .. padLeft(tostring(item.count),
-            CONFIG.countWidth)
+            CONFIG.countWidth), w)
       )
       row = row + 1
     end
