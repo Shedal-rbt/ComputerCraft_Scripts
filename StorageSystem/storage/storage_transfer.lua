@@ -260,16 +260,27 @@ local function cmdStore()
         printError(("  no room for %s anywhere"):format(item.name))
       else
         -- pushItems(toName, fromSlot, limit, toSlot)
-        local ok, actual = pcall(inbox.pushItems,
-          destName, slot, item.count, destSlot)
-        if ok and actual then
-          moved = moved + actual
-          if destName == roles.messy then
-            toMessy = toMessy + actual
-          end
-        else
-          printError(("  push failed %s -> %s: %s"):format(
+        local remaining = item.count
+        while remaining > 0 do
+          local ok, actual = pcall(inbox.pushItems,
+            destName, slot, item.count, destSlot)
+          if not ok then
+            printError(("  push failed %s -> %s: %s"):format(
             item.name, destName, tostring(actual)))
+            break
+          end
+          if not actual or actual <= 0 then
+            -- Dest slot full, or cant accept
+            break
+          end
+          moved = moved + actual
+          remaining = remaining - actual
+          if destName == roles.messy then
+              toMessy = toMessy + actual
+          end
+        end
+        if remaining > 0 then
+          print((" %d of %s remain in inbox slot %d"):format(remaining, item.name, slot))
         end
       end
     end
