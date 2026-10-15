@@ -128,7 +128,6 @@ function inventory.matchSignature(contents, signature)
   end
   return true
 end
-return inventory
 
 function inventory.resolveRoles(roles)
   local resolved = {}
@@ -144,3 +143,4 @@ function inventory.resolveRoles(roles)
   end
   return resolved
 end
+return inventory
