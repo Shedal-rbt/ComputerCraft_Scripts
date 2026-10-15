@@ -116,4 +116,31 @@ function inventory.splitName(full)
   return "", full
 end
 
+-- does this inventory's contents match the given signature?
+-- signature is an array like {{name = "..."},{name = "..."},{name = "..."}, ... }
+-- missing signature means "any" for that slot.
+function inventory.matchSignature(contents, signature)
+  for i, expected in ipairs(signature) do
+    local item = contents[i]
+    if not item then return false end
+    if expected.name and item.name ~= expected.name then return false end
+    if expected.count and item.count < expected.count then return false end
+  end
+  return true
+end
 return inventory
+
+function inventory.resolveRoles(roles)
+  local resolved = {}
+  for _, name in ipairs(inventory.find()) do
+    local contents = inventory.listContents(name)
+    if contents then
+      for role, signature in pairs(roles) do 
+        if inventory.matchSignature(contents, signature) then
+          resolved[role] = name]
+        end
+      end
+    end
+  end
+  return resolved
+end
