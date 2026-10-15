@@ -92,6 +92,20 @@ function inventory.scanOne(name)
   return contents or {}
 end
 
+-- Returns { [PeripheralName] = ContentsTable} for
+-- each unique inventory.
+-- ContentsTable is what list() returns: slot->name, count }
+function inventory.scanEach()
+  local out = {}
+  for _, name in ipairs(inventory.find()) do
+    local contents = inventory.listContents(name)
+    if contents then
+      out[name] = contents
+    end
+  end
+  return out
+end
+
 -- Splits an item into its mod name and item name
 -- Returns mod name and item name seperately, if no mod name detected, returns "" and original string. 
 function inventory.splitName(full)
